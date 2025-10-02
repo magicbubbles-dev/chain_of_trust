@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chain of Trust</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Special+Elite&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="header">
+        <h1 class="title">Chain of Trust</h1>
+        <p class="subtitle">~Every subject leaves a trace. Some will endure, most will not.</p>
+    </div>
+
+    <div class="container">
+        <div class="left">
+        <div class="manifesto">
+            <p>Trust is fragile.<br>
+            It is the thread that binds subjects together.
+            <br>Shared - it strengthens the chain.
+            <br>Broken - it drags everyone down.<br><br>
+            The Lab exists to watch these fractures form,<br>
+            to measure who holds the line<br>
+            and who pulls it apart.</p>
+        </div>
+        </div>
+    </div>
+    
+    <div class="notice-container">
+        <h5><strong>** NOTICE:</strong>  YOU ARE ENTERING AN ACTIVE FIELD EXPERIMENT. THIS IS NOT A GAME. 
+        EVERY DECISION YOU MAKE WILL BE OBSERVED, RECORDED, AND WEIGHED. THE LAB IS WATCHING.</h5>
+    
+    <div class="container">
+        <div class="left">
+            <div class="instructions">
+            <h4>You are about to enter <strong>The Lab. </strong></h4>
+        <p>Each participant receives: <br>
+        – A Subject Card, generated uniquely from your submission.<br>
+        – A Secret Key, delivered privately to your email.<br><br>
+            Your card proves you exist.<br>
+            Your key grants you entry.<br>
+            Keep it safe: this is your only access to the Lab once the gates open.<br><br>
+            Once registered, further instructions will arrive through the email address you provide. 
+            <br>Enter it carefully — there are no replacements. </p>
+        
+        </div>
+
+        <form id="cardForm" enctype="multipart/form-data">
+            <br>
+            <label for="username">> CODENAME (required):</label>
+            <input type="text" id="username" name="username" placeholder="Enter your codename" required>
+
+            <label for="name">> NICKNAME (to be displayed on card, if you don't enter you'll be declared Anon which "IS NOT" recommended for the experiment):</label>
+            <input type="text" id="name" name="name" placeholder="Enter your nickname">
+
+            <label for="email">> EMAIL (required):</label>
+            <input type="email" id="email" name="email" placeholder="Enter your email address" required>
+
+            <label for="pfp_file">> PROFILE PICTURE (to be displayed on card, if you don't upload any image your card will be generated without it which "IS NOT" recommended for the experiment):</label>
+            <input type="file" id="pfp_file" name="pfp_file" accept="image/*">
+            <br><br><p style="font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif; font-size: 1.2em; color: rgb(202, 41, 41);">Subjects are asked to provide the correct email address. 
+                <br>Failure to do so will result in loss of access to the Lab. 
+            <br>Furthermore, you CAN NOT register more than once. Cross-check your information before generating the card.
+            <br></p><br>
+            <button type="submit" class="btn">GENERATE CARD</button>
+            <p id="successMessage" style="font-family: 'Special Elite', cursive; font-size: 1.1em; color: green; margin-top: 10px;"></p>
+        </form>
+    </div>
+
+    <div class="right">
+        <h2>SUBJECT CARD PREVIEW</h2>
+        <div id="cardContainer">
+            <p>Your identification card will appear here once generated.</p>
+            <p>This document serves as proof of your registration in the Chain of Trust program.</p>
+        </div>
+    </div>
+    </div>
+
+    <script>
+    const form = document.getElementById("cardForm");
+    const successMessage = document.getElementById("successMessage"); // Get the success message element
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+    const cardContainer = document.getElementById("cardContainer");
+    successMessage.textContent = ""; 
+
+    try {
+        const formData = new FormData(form);
+        const response = await fetch("http://localhost:8000/create_user", {
+        method: "POST",
+        body: formData
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        const cardUrl = `http://localhost:8000/cards/${data.card_path.split('/').pop()}`;
+    
+        cardContainer.innerHTML = `
+        <a class="download-btn" href="${cardUrl}" download>Download Card</a><br><br>
+        <img src="${cardUrl}" alt="Generated Card" width="400">
+        `;
+
+      // Display the success message
+        successMessage.innerHTML = "Check your inbox for the key. (check the spam folder if you don't see it.)";
+
+        // Send email in the background (no UI change)
+        const emailFormData = new FormData();
+        emailFormData.append("user_id", data.user_id);
+        emailFormData.append("unique_key", data.unique_key);
+        emailFormData.append("username", data.username); // Append username to email form data
+        fetch("http://localhost:8000/send-email", {
+            method: "POST",
+            body: emailFormData
+        });
+    } else {
+        const errorText = await response.text();
+        cardContainer.innerHTML = `
+        <h4><p style="color:red">Error generating card. <br>
+        <br>Either you've not entered the username or it's already in use<br> or you've not entered the email or it's already in use.</p></h4>`;
+    }
+} catch (error) {
+    cardContainer.innerHTML = `<p style="color:red">Error generating card.</p>`;
+    }
+});
+
+
+</script>
+
+</body>
+</html>

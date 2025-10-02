@@ -89,14 +89,14 @@
 
     try {
         const formData = new FormData(form);
-        const response = await fetch("http://localhost:8000/create_user", {
+        const response = await fetch("/create_user", {
         method: "POST",
         body: formData
     });
 
     if (response.ok) {
         const data = await response.json();
-        const cardUrl = `http://localhost:8000/cards/${data.card_path.split('/').pop()}`;
+        const cardUrl = `/cards/${data.card_path.split('/').pop()}`;
     
         cardContainer.innerHTML = `
         <a class="download-btn" href="${cardUrl}" download>Download Card</a><br><br>
@@ -111,7 +111,7 @@
         emailFormData.append("user_id", data.user_id);
         emailFormData.append("unique_key", data.unique_key);
         emailFormData.append("username", data.username); // Append username to email form data
-        fetch("http://localhost:8000/send-email", {
+        fetch("/send-email", {
             method: "POST",
             body: emailFormData
         });

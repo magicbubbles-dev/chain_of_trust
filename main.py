@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from datetime import datetime
@@ -72,6 +73,22 @@ Base.metadata.create_all(bind=engine)
 ################################################
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Configure CORS to allow both localhost (development) and production domain
+origins = [
+    "http://localhost:8000",  # Development
+    "http://127.0.0.1:8000",  # Development alternative
+    "https://chainoftrust.onrender.com",  # Production
+    "https://www.chainoftrust.onrender.com",  # Production with www
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 os.makedirs("cards", exist_ok=True)
 app.mount("/cards", StaticFiles(directory="cards"), name="cards")

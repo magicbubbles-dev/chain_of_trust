@@ -6,24 +6,11 @@ def generate_card(pfp_path, sub_number, sub_name="Anon", output_path="custom_car
         grain_strength=0.1, grain_sigma=80,
         font_path=None):
 
-    # Determine font path - prioritize Helvetica, then fallbacks
     if font_path is None:
-        # Try Helvetica first (most common locations)
-        possible_fonts = [
-            "/usr/share/fonts/truetype/msttcorefonts/Helvetica.ttf",  # Linux MS Core Fonts
-            "/usr/share/fonts/Helvetica.ttf",  # Linux alternative
-            "/usr/share/fonts/truetype/helvetica/Helvetica.ttf",  # Linux Helvetica package
-            "/Library/Fonts/Helvetica.ttc",  # macOS
-            "/System/Library/Fonts/Helvetica.ttc",  # macOS alternative
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux fallback
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",  # Another Linux fallback
-        ]
-        
-        for path in possible_fonts:
-            if os.path.exists(path):
-                font_path = path
-                print(f"Using font: {path}")
-                break
+        # First try local bundled font
+        local_font = os.path.join("fonts", "Helvetica.ttf")
+        if os.path.exists(local_font):
+            font_path = local_font
         else:
             font_path = None  # Will use default font
             print("No system fonts found, using PIL default")

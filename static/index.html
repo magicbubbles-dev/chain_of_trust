@@ -73,6 +73,7 @@
             <br></p><br>
             <button type="submit" class="btn">GENERATE CARD</button>
             <p id="successMessage" style="font-family: 'Special Elite', cursive; font-size: 1.1em; color: green; margin-top: 10px;"></p>
+            <p id="loadingMessage" style="font-family: 'Special Elite', cursive; font-size: 1.1em; color: green; margin-top: 10px; display: none;">....Generating your card....</p>
         </form>
     </div>
 
@@ -91,12 +92,14 @@
     <script>
     const form = document.getElementById("cardForm");
     const successMessage = document.getElementById("successMessage"); // Get the success message element
+    const loadingMessage = document.getElementById("loadingMessage"); // Get the loading message element
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
     const cardContainer = document.getElementById("cardContainer");
     successMessage.textContent = ""; 
+    loadingMessage.style.display = "block"; // Show loading message 
 
     try {
         const formData = new FormData(form);
@@ -114,7 +117,8 @@
         <img src="${cardUrl}" alt="Generated Card" width="400">
         `;
 
-      // Display the success message
+        loadingMessage.style.display = "none"; // Hide loading message
+        // Display the success message
         successMessage.innerHTML = "Check your inbox for the key. (check the spam folder if you don't see it.)";
 
         // Send email in the background (no UI change)
@@ -128,11 +132,13 @@
         });
     } else {
         const errorText = await response.text();
+        loadingMessage.style.display = "none"; // Hide loading message
         cardContainer.innerHTML = `
         <h4><p style="color:red">Error generating card. <br>
         <br>Either you've not entered the username or it's already in use<br> or you've not entered the email or it's already in use.</p></h4>`;
     }
 } catch (error) {
+    loadingMessage.style.display = "none"; // Hide loading message
     cardContainer.innerHTML = `<p style="color:red">Error generating card.</p>`;
     }
 });

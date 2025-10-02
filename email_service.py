@@ -46,7 +46,7 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
                         <strong>Your personal access key:</strong> <span style='font-size:1.2em'>{username}</span><br>
                         <span style='font-weight:bold; color:#b00;'>*This is confidential. Do not share it. Do not lose it.*</span><br><br>
                         You'll receive further instructions very soon.<br><br>
-                        Till then,<br><br>
+                        Till then<br><br>
                         <strong>- The Lab<br>Chain of Trust</strong>
                         </p>
                     </body>

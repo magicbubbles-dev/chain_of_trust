@@ -193,3 +193,21 @@ def send_email(
         logger.error(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
+
+# SPA Fallback Route - Catch all other routes and serve index.html
+# This ensures that client-side routing works properly on platforms like Render
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    """
+    Catch-all route for Single Page Application.
+    Serves index.html for any route that doesn't match API endpoints or static files.
+    This prevents 404 errors when users reload the page or navigate directly to routes.
+    """
+    if full_path.startswith(("static/", "cards/")):
+        # Let FastAPI handle static files normally
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # For all other routes, serve the main page (SPA routing)
+    with open("static/index.html", "r") as f:
+        return HTMLResponse(content=f.read())
+

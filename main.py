@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, text
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from datetime import datetime
 import os
@@ -25,6 +25,8 @@ Base = declarative_base()
 
 ENV = os.getenv("ENVIRONMENT", "development").lower()
 logger.info(f"Running in {ENV.upper()} environment")
+logger.info(f"DATABASE_URL: {os.getenv('DATABASE_URL', 'NOT SET')}")
+logger.info(f"DB_TOKEN: {'***SET***' if os.getenv('DB_TOKEN') else 'NOT SET'}")
 
 if ENV == "production":
     # Production: Use Turso DB
@@ -100,6 +102,33 @@ def get_db():
     finally:
         db.close()
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    """Health check endpoint to verify database connection"""
+    try:
+        # Test database connection
+        result = db.execute(text("SELECT 1"))
+        result.fetchone()
+        
+        # Get user count
+        user_count = db.query(Users).count()
+        
+        return {
+            "status": "healthy",
+            "environment": ENV.upper(),
+            "database": "Turso" if ENV == "production" else "SQLite",
+            "user_count": user_count,
+            "database_url": os.getenv("DATABASE_URL", "NOT SET")[:50] + "..." if os.getenv("DATABASE_URL") else "NOT SET"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "environment": ENV.upper(),
+            "database": "Turso" if ENV == "production" else "SQLite"
+        }
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     with open("static/index.html", "r") as f:
@@ -115,50 +144,61 @@ def create_user(
 ):
     logger.info(f"Processing card generation request (ID: {abs(hash(username)) % 1000000 if username else 'unknown'})")
 
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
+    try:
+        if not username:
+            raise HTTPException(status_code=400, detail="Username is required")
 
-    # Create new user record
-    new_user = Users(username=username, email=email, name=name)
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+        # Create new user record
+        new_user = Users(username=username, email=email, name=name)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        logger.info(f"User created with ID: {new_user.id}, using database: {'Turso' if ENV == 'production' else 'SQLite'}")
 
-    new_user.subject_no = f"{new_user.id:03d}"
+        new_user.subject_no = f"{new_user.id:03d}"
 
-    # --- Generate card ---
-    os.makedirs("cards", exist_ok=True)
-    card_filename = f'{username}_{new_user.id}.png'
-    card_path = os.path.join("cards", card_filename)
-    new_user.card_path = card_path
+        # --- Generate card ---
+        os.makedirs("cards", exist_ok=True)
+        card_filename = f'{username}_{new_user.id}.png'
+        card_path = os.path.join("cards", card_filename)
+        new_user.card_path = card_path
 
-    if pfp_file and pfp_file.filename:
-        temp_pfp_path = f"temp_{username}.png"
-        with open(temp_pfp_path, "wb") as buffer:
-            buffer.write(pfp_file.file.read())
-        generate_card(temp_pfp_path, new_user.subject_no, new_user.name, card_path)
-        os.remove(temp_pfp_path)
-    else:
-        generate_card(None, new_user.subject_no, new_user.name, card_path)
+        if pfp_file and pfp_file.filename:
+            temp_pfp_path = f"temp_{username}.png"
+            with open(temp_pfp_path, "wb") as buffer:
+                buffer.write(pfp_file.file.read())
+            generate_card(temp_pfp_path, new_user.subject_no, new_user.name, card_path)
+            os.remove(temp_pfp_path)
+        else:
+            generate_card(None, new_user.subject_no, new_user.name, card_path)
 
-    # --- Generate unique key ---
-    raw_key = generate_unique_key()
-    hashed_key = hashlib.sha256(raw_key.encode()).hexdigest()
-    new_user.unique_key = hashed_key
+        # --- Generate unique key ---
+        raw_key = generate_unique_key()
+        hashed_key = hashlib.sha256(raw_key.encode()).hexdigest()
+        new_user.unique_key = hashed_key
 
-    db.commit()
-    db.refresh(new_user)
+        db.commit()
+        db.refresh(new_user)
+        logger.info(f"User data committed successfully: {new_user.username} (ID: {new_user.id})")
 
-    # Email will be sent separately via the /send-email endpoint
-    # to avoid blocking the response
+        # Email will be sent separately via the /send-email endpoint
+        # to avoid blocking the response
 
-    return JSONResponse({
-        "success": True,
-        "subject_no": new_user.subject_no,
-        "card_path": card_path,
-        "user_id": new_user.id,
-        "unique_key": raw_key 
-    })
+        return JSONResponse({
+            "success": True,
+            "subject_no": new_user.subject_no,
+            "card_path": card_path,
+            "user_id": new_user.id,
+            "unique_key": raw_key 
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating user: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        db.rollback()  # Rollback on error
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.post("/send-email")
 def send_email(

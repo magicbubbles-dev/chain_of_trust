@@ -15,6 +15,12 @@ EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "gmail").lower()
 if EMAIL_PROVIDER == "gmail":
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
+elif EMAIL_PROVIDER == "sendgrid":
+    SMTP_SERVER = "smtp.sendgrid.net"
+    SMTP_PORT = 587
+elif EMAIL_PROVIDER == "mailgun":
+    SMTP_SERVER = "smtp.mailgun.org"
+    SMTP_PORT = 587
 
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASS = os.getenv("SENDER_PASS")
@@ -70,7 +76,18 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
 
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
-            server.login(SENDER_EMAIL, SENDER_PASS)
+            
+            # Handle different authentication methods
+            if EMAIL_PROVIDER == "sendgrid":
+                # SendGrid uses "apikey" as username and API key as password
+                server.login("apikey", SENDER_PASS)
+            elif EMAIL_PROVIDER == "mailgun":
+                # Mailgun uses full email as username and API key as password
+                server.login(SENDER_EMAIL, SENDER_PASS)
+            else:
+                # Default Gmail authentication
+                server.login(SENDER_EMAIL, SENDER_PASS)
+                
             server.send_message(msg)
             logger.info(f"Email sent successfully to {recipient_email}")
             return True

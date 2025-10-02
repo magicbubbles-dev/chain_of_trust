@@ -4,7 +4,29 @@ import os
 
 def generate_card(pfp_path, sub_number, sub_name="Anon", output_path="custom_card.png",
         grain_strength=0.1, grain_sigma=80,
-        font_path="/Library/Fonts/Helvetica.ttc"):
+        font_path=None):
+
+    # Determine font path - prioritize Helvetica, then fallbacks
+    if font_path is None:
+        # Try Helvetica first (most common locations)
+        possible_fonts = [
+            "/usr/share/fonts/truetype/msttcorefonts/Helvetica.ttf",  # Linux MS Core Fonts
+            "/usr/share/fonts/Helvetica.ttf",  # Linux alternative
+            "/usr/share/fonts/truetype/helvetica/Helvetica.ttf",  # Linux Helvetica package
+            "/Library/Fonts/Helvetica.ttc",  # macOS
+            "/System/Library/Fonts/Helvetica.ttc",  # macOS alternative
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux fallback
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",  # Another Linux fallback
+        ]
+        
+        for path in possible_fonts:
+            if os.path.exists(path):
+                font_path = path
+                print(f"Using font: {path}")
+                break
+        else:
+            font_path = None  # Will use default font
+            print("No system fonts found, using PIL default")
 
     # if user uploads pfp
     if pfp_path:
@@ -48,9 +70,15 @@ def generate_card(pfp_path, sub_number, sub_name="Anon", output_path="custom_car
         # draw text
         draw_tpl = ImageDraw.Draw(tpl)
         try:
-            font_subject = ImageFont.truetype(font_path, subject_font_size)
-            font_name = ImageFont.truetype(font_path, name_font_size)
-        except Exception:
+            if font_path:
+                font_subject = ImageFont.truetype(font_path, subject_font_size)
+                font_name = ImageFont.truetype(font_path, name_font_size)
+            else:
+                # Use default font if no system font found
+                font_subject = ImageFont.load_default()
+                font_name = ImageFont.load_default()
+        except Exception as e:
+            print(f"Font loading failed: {e}, using default font")
             # size ignored for default font
             font_subject = ImageFont.load_default()
             font_name = ImageFont.load_default()
@@ -72,9 +100,19 @@ def generate_card(pfp_path, sub_number, sub_name="Anon", output_path="custom_car
         name_font_size=50
         tpl = Image.open("Chain_of_trust_anon.png").convert("RGBA")
         draw_tpl = ImageDraw.Draw(tpl)
-        #try:
-        font_subject = ImageFont.truetype(font_path, subject_font_size)
-        font_name = ImageFont.truetype(font_path, name_font_size)
+        
+        try:
+            if font_path:
+                font_subject = ImageFont.truetype(font_path, subject_font_size)
+                font_name = ImageFont.truetype(font_path, name_font_size)
+            else:
+                # Use default font if no system font found
+                font_subject = ImageFont.load_default()
+                font_name = ImageFont.load_default()
+        except Exception as e:
+            print(f"Font loading failed: {e}, using default font")
+            font_subject = ImageFont.load_default()
+            font_name = ImageFont.load_default()
         white = (255, 240, 230, 255)
         stroke_width = 1
 

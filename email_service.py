@@ -74,8 +74,15 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
 
         logger.info(f"Sending email to {recipient_email} with card {os.path.basename(card_path)}")
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        logger.info(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT} with provider {EMAIL_PROVIDER}")
+        
+        # Add timeout to prevent hanging
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
+            logger.info("SMTP connection established, starting TLS")
             server.starttls()
+            
+            # Log authentication attempt (without sensitive data)
+            logger.info(f"Attempting login for {EMAIL_PROVIDER} with user: {SENDER_EMAIL if EMAIL_PROVIDER != 'sendgrid' else 'apikey'}")
             
             # Handle different authentication methods
             if EMAIL_PROVIDER == "sendgrid":
@@ -88,6 +95,8 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
                 # Default Gmail authentication
                 server.login(SENDER_EMAIL, SENDER_PASS)
                 
+            logger.info("Authentication successful")
+                
             server.send_message(msg)
             logger.info(f"Email sent successfully to {recipient_email}")
             return True
@@ -99,5 +108,16 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
         # Provide more helpful error messages based on error type
         if "535" in error_msg and "Username and Password not accepted" in error_msg:
             logger.error(f"Authentication failed for {EMAIL_PROVIDER}. Check your credentials.")
+        elif "socket.gaierror" in error_msg or "getaddrinfo" in error_msg:
+            logger.error(f"DNS resolution failed for {SMTP_SERVER}. Check network connectivity.")
+        elif "Connection refused" in error_msg:
+            logger.error(f"Connection refused to {SMTP_SERVER}:{SMTP_PORT}. The server might be blocking requests.")
+        elif "timeout" in error_msg.lower():
+            logger.error(f"Connection timed out to {SMTP_SERVER}:{SMTP_PORT}.")
+        elif "certificate" in error_msg.lower() or "ssl" in error_msg.lower():
+            logger.error(f"SSL/TLS error connecting to {SMTP_SERVER}. This may be due to security restrictions.")
+        
+        # Print all environment variables (redacted) to help with debugging
+        logger.error(f"Environment check: EMAIL_PROVIDER={EMAIL_PROVIDER}, SENDER_EMAIL={'[SET]' if SENDER_EMAIL else '[MISSING]'}, SENDER_PASS={'[SET]' if SENDER_PASS else '[MISSING]'}")
         
         return False

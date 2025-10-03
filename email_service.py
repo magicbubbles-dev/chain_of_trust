@@ -42,7 +42,9 @@ def send_card_email(recipient_email: str, subject_no: int, card_path: str, uniqu
         <strong>Your username:</strong> <span style='font-size:1.2em'>{unique_key}</span><br>
         <strong>Your personal access key:</strong> <span style='font-size:1.2em'>{username}</span><br>
         <span style='font-weight:bold; color:#b00;'>*This is confidential. Do not share it. Do not lose it.*</span><br><br>
-        You'll receive further instructions very soon.<br><br>
+        You'll receive further instructions very soon.
+        <br>
+        [subjects are advised to "star" this mail]<br><br>
         <strong>- The Lab<br>Chain of Trust</strong>
         </p>
       </body>

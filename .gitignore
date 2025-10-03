@@ -4,3 +4,4 @@ venv/
 
 token.json 
 credentials.json
+gmail_auth.py 

@@ -1,29 +1,19 @@
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import os
 import logging
-from dotenv import load_dotenv
+import base64
 
-load_dotenv()
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 
-EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "gmail").lower()
+# Gmail API scope
+SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
-# Configure SMTP settings based on provider
-if EMAIL_PROVIDER == "gmail":
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-elif EMAIL_PROVIDER == "sendgrid":
-    SMTP_SERVER = "smtp.sendgrid.net"
-    SMTP_PORT = 587
-elif EMAIL_PROVIDER == "mailgun":
-    SMTP_SERVER = "smtp.mailgun.org"
-    SMTP_PORT = 587
-
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASS = os.getenv("SENDER_PASS")
+# Path to token.json (generated locally and uploaded to your server)
+TOKEN_PATH = os.getenv("GMAIL_TOKEN_PATH", "token.json")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -31,17 +21,21 @@ logger = logging.getLogger(__name__)
 
 def send_card_email(recipient_email, subject_no, card_path, unique_key, username):
     try:
-        # Check if we have email credentials
-        if not SENDER_EMAIL or not SENDER_PASS:
-            logger.error("Missing email credentials. Check your .env file.")
+        if not os.path.exists(TOKEN_PATH):
+            logger.error("Missing token.json. Run the Gmail OAuth flow to generate it.")
             return False
 
+        # Load Gmail credentials
+        creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+        service = build("gmail", "v1", credentials=creds)
+
+        # Build email
         msg = MIMEMultipart()
-        msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
+        msg["From"] = creds.token_uri  # Gmail API fills this correctly when sending
         msg["Subject"] = f"⚠️ WELCOME TO THE LAB | Subject #{subject_no} | CONFIDENTIAL"
 
-        # imma exchanging personal access key and username here
+        # HTML body (kept same as your code)
         body = f"""
                 <html>     
                     <body>
@@ -60,64 +54,33 @@ def send_card_email(recipient_email, subject_no, card_path, unique_key, username
                 """
         msg.attach(MIMEText(body, "html"))
 
+        # Attach card
         if not os.path.exists(card_path):
             logger.error(f"Card file not found: {card_path}")
             return False
 
-        # Attach card
         with open(card_path, "rb") as f:
             part = MIMEBase("application", "octet-stream")
             part.set_payload(f.read())
             encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f"attachment; filename={os.path.basename(card_path)}")
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename={os.path.basename(card_path)}"
+            )
             msg.attach(part)
 
         logger.info(f"Sending email to {recipient_email} with card {os.path.basename(card_path)}")
 
-        logger.info(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT} with provider {EMAIL_PROVIDER}")
-        
-        # Add timeout to prevent hanging
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30) as server:
-            logger.info("SMTP connection established, starting TLS")
-            server.starttls()
-            
-            # Log authentication attempt (without sensitive data)
-            logger.info(f"Attempting login for {EMAIL_PROVIDER} with user: {SENDER_EMAIL if EMAIL_PROVIDER != 'sendgrid' else 'apikey'}")
-            
-            # Handle different authentication methods
-            if EMAIL_PROVIDER == "sendgrid":
-                # SendGrid uses "apikey" as username and API key as password
-                server.login("apikey", SENDER_PASS)
-            elif EMAIL_PROVIDER == "mailgun":
-                # Mailgun uses full email as username and API key as password
-                server.login(SENDER_EMAIL, SENDER_PASS)
-            else:
-                # Default Gmail authentication
-                server.login(SENDER_EMAIL, SENDER_PASS)
-                
-            logger.info("Authentication successful")
-                
-            server.send_message(msg)
-            logger.info(f"Email sent successfully to {recipient_email}")
-            return True
+        # Encode and send via Gmail API
+        raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        message = {"raw": raw_message}
+
+        service.users().messages().send(userId="me", body=message).execute()
+
+        logger.info(f"Email sent successfully to {recipient_email}")
+        return True
 
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Failed to send email: {error_msg}")
-        
-        # Provide more helpful error messages based on error type
-        if "535" in error_msg and "Username and Password not accepted" in error_msg:
-            logger.error(f"Authentication failed for {EMAIL_PROVIDER}. Check your credentials.")
-        elif "socket.gaierror" in error_msg or "getaddrinfo" in error_msg:
-            logger.error(f"DNS resolution failed for {SMTP_SERVER}. Check network connectivity.")
-        elif "Connection refused" in error_msg:
-            logger.error(f"Connection refused to {SMTP_SERVER}:{SMTP_PORT}. The server might be blocking requests.")
-        elif "timeout" in error_msg.lower():
-            logger.error(f"Connection timed out to {SMTP_SERVER}:{SMTP_PORT}.")
-        elif "certificate" in error_msg.lower() or "ssl" in error_msg.lower():
-            logger.error(f"SSL/TLS error connecting to {SMTP_SERVER}. This may be due to security restrictions.")
-        
-        # Print all environment variables (redacted) to help with debugging
-        logger.error(f"Environment check: EMAIL_PROVIDER={EMAIL_PROVIDER}, SENDER_EMAIL={'[SET]' if SENDER_EMAIL else '[MISSING]'}, SENDER_PASS={'[SET]' if SENDER_PASS else '[MISSING]'}")
-        
         return False
